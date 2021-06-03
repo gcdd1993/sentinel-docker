@@ -2,6 +2,9 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+global:
+  timezone: Asia/Shanghai
+
 config:
   username: sentinel
   password: sentinel
@@ -47,7 +50,7 @@ init: []
   #     - name: <VOLUME_NAME>
   #       mountPath: <MOUNT_PATH>
 
-services: {}
+services:
   http:
     type: ClusterIP
     ports:

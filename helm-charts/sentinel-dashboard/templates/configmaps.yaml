@@ -3,7 +3,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: sv930-config
+  name: {{ include "fullname" $global }}-config
   labels:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}

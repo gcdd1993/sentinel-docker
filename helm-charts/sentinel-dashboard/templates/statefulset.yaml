@@ -1,0 +1,44 @@
+{{- if eq .Values.type "statefulset"}}
+{{- $global := .}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "fullname" $global }}
+  labels:
+    app: {{ include "name" $global }}
+    chart: {{ include "chart" $global }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  serviceName: {{required "please specify the headless service for statefulset" (include "serviceNameOf" (tuple .Chart.Name .Values.serviceName .Values . ))}}
+  replicas: {{default 1 .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "name" $global }}
+      release: {{ .Release.Name }}
+  template:
+    {{- tpl (.Files.Get "pod.template" ) $global  | indent 4}}
+  {{- if .Values.volumeClaims }}
+  volumeClaimTemplates:
+  {{- range $name,$claim := .Values.volumeClaims }}
+    - metadata:
+        name: {{ include "fullname" $global }}-{{ $name }}-pvc
+        labels:
+          app: {{ include "name" $global }}
+          chart: {{ include "chart" $global }}
+          release: {{ $global.Release.Name }}
+          heritage: {{ $global.Release.Service }}
+      spec:
+        accessModes:
+          - {{ $claim.accessMode | quote }}
+        resources:
+          requests:
+            storage: {{ $claim.size | quote }}
+        storageClassName: {{ default "" $claim.storageClass }}
+  {{- end }}        
+  {{- end }}
+  updateStrategy:
+    rollingUpdate:
+      partition: 0
+    type: RollingUpdate
+{{- end }}

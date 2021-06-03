@@ -1,0 +1,22 @@
+{{- if eq .Values.type "deployment"}}
+{{- $global := . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "fullname" $global }}
+  labels:
+    app: {{ include "name" $global }}
+    chart: {{ include "chart" $global }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "name" $global }}
+      release: {{ .Release.Name }}
+  strategy:
+    type: {{default "RollingUpdate" .Values.strategyType }}
+  template:
+    {{- tpl (.Files.Get "pod.template" ) $global  | indent 4}}
+{{- end }}

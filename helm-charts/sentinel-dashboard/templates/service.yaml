@@ -1,0 +1,37 @@
+{{- if or .Values.services }}
+{{- $global := . }}
+{{- range $name,$svc := .Values.services }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  {{- $svcIdentity := include "serviceNameOf" (tuple $global.Chart.Name $name $global.Values $global) }}
+  name: {{ $svcIdentity }}
+  labels:
+    app: {{ include "name" $global }}
+    chart: {{ include "chart" $global }}
+    release: {{ $global.Release.Name }}
+    heritage: {{ $global.Release.Service }}
+spec:
+{{- with $svc }}
+  sessionAffinity: {{ default "None" .sessionAffinity }}
+  type: {{ .type }}
+  ports:
+  {{- if .ports  }}
+  {{- range $pName,$p := .ports }}
+    {{- $portFullname := include "portNameOf" (tuple $name $pName $global.Values $global) }}
+    - name: {{ $portFullname }}
+      port: {{ $p.port }}
+      {{- if $p.nodePort }}
+      nodePort: {{ $p.nodePort }}
+      {{- end }}
+      protocol: {{ default "TCP" $p.protocol }}
+      targetPort: {{ $portFullname }}
+  {{- end }}
+  {{- end }}
+{{- end }}
+  selector:
+    app: {{ include "name" $global }}
+    release: {{ $global.Release.Name }}
+{{- end }}
+{{- end }} # end of range .Values.services

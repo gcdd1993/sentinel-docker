@@ -1,0 +1,188 @@
+# Default values for sentinel-dashboard.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+config:
+  username: sentinel
+  password: sentinel
+
+replicaCount: 1
+
+image:
+  # registry: test
+  repository: gcdd1993/sentinel-dashboard
+  tag: 1.8.1
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+  # pre-declared Secret , array of Secret name
+
+nameOverride: ""
+fullnameOverride: "sentinel-dashboard"
+
+env:
+  - name: USERNAME
+    valueFrom:
+      configMapKeyRef:
+        name: sentinel-dashboard-config
+        key: sentinel_username
+  - name: PASSWORD
+    valueFrom:
+      configMapKeyRef:
+        name: sentinel-dashboard-config
+        key: sentinel_password
+
+init: []
+# init containers
+  # - image:
+  #     repository: 
+  #     registry:
+  #     tag:
+  #     pullPolicy:
+  #   env:
+  #     - name: SOME_ENV
+  #       value: SOME_VALUE
+  #   command: [""]
+  #   args: [""]
+  #   volumeMounts: 
+  #     - name: <VOLUME_NAME>
+  #       mountPath: <MOUNT_PATH>
+
+services: {}
+  http:
+    type: ClusterIP
+    ports:
+      default:
+        port: 8080
+
+ingress:
+  enabled: false
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  path: /
+  hosts:
+    - chart-example.local
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources: {}
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #  cpu: 100m
+  #  memory: 128Mi
+  # requests:
+  #  cpu: 100m
+  #  memory: 128Mi
+
+dockerize:
+  tag: latest
+  timeout: 60s
+# dockerize default timeout
+
+configs: []
+  # array of Configs
+  # - name : <config_map_name>
+  #   mountPath: <path_in_container>
+  #   items:
+  #   - key: <key_in_config_map>
+  #     path: <The relative path of the file to map the key to. May not be an absolute path. May not contain the path element '..'. May not start with the string '..'.>
+  #   
+  #     
+  #
+
+args: []
+# command for container, string array
+
+dependencies: {}
+# Probe v1 core,  only support tcpSocket and httpGet
+# reference https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.11/#probe-v1-core
+  # <name>:
+  #   service:
+  #     target: <target service archor>
+  #     name: <target service name>
+  #     type: <http or tcp>
+  #     port: <target port name under service>
+  #     uri: <uri path , only valid for http>
+
+  # <name>:
+  #     tcp:
+  #       host: <host>
+  #       port: <port>
+  # <name>:
+  #     http:
+  #       host: <host>
+  #       port: <port>
+  #       path: <http path>
+
+type: deployment
+#  deployment
+#  statefulset
+#  replicaset
+#  daemonset
+
+volumeMounts: []
+    # - name : <VOLUME_NAME>
+    #   mountPath: <MOUNT_PATH_IN_CONTAINER>
+    #   subPath: <PATH_IN_VOLUME>
+
+volumes: []
+  #  refrence https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.12/#volume-v1-core
+
+
+livenessProbe: {}
+# reference https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.11/#probe-v1-core
+  # - tcpSocket:
+  #     host: <host>
+  #     port: <port>
+  #   initialDelaySeconds: 60s
+  #   periodSeconds: 10s
+  #   timeoutSeconds: 60s
+  #   failureThreshold: 3
+  # - exec:
+  #     command: ["some","command"]
+
+readinessProbe: {}
+# same as livenessProbe
+
+nodeSelector: {}
+# Pod Spec
+# reference: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+
+tolerations: []
+# Pod Spec, array of teleration
+# reference: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.11/#toleration-v1-core
+
+affinity: {}
+# pod spec affinity
+# reference: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.11/#affinity-v1-core
+
+
+extra: {}
+# extra container fields
+# reference: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.11/#container-v1-core
+  # env: <env>
+  # envFrom:
+
+##
+## CronJob
+##
+cronjob:
+  schedule: "0 * * * *"
+##
+## StatefulSet
+##
+
+serviceName: ""
+volumeClaims: {}
+  # name:
+  #   storageClass: <storage_class_name>
+  #   accessMode: ReadWriteOnce
+  #   size: 1Gi

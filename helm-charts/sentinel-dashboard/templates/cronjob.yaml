@@ -1,0 +1,18 @@
+{{- if eq .Values.type "cronjob" }}
+{{- $global := . }}
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: {{ include "fullname" $global }}
+  labels:
+    app: {{ include "name" $global }}
+    chart: {{ include "chart" $global }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  schedule: {{required "please set schedule for cronjob" .Values.cronjob.schedule | quote }}
+  jobTemplate:
+    spec:
+      template:
+  {{- tpl (.Files.Get "pod.template" ) $global  | indent 8}}
+{{- end }}

@@ -1,0 +1,218 @@
+{{ $global := . }}
+{{ $timezone := default "Asia/RPC" .Values.global.timezone  }}
+metadata:
+  labels:
+    app: {{ include "name" $global }}
+    release: {{ .Release.Name }}
+spec:
+{{- if .Values.image.pullSecrets }}
+  imagePullSecrets:
+  {{- range .Values.image.pullSecrets }}
+    - name: {{ . }}
+  {{- end}}  
+{{- end }}
+{{- if or .Values.init .Values.dependencies  }} ## start of init
+  initContainers:
+  {{- if .Values.init }}
+  {{- range $i,$obj := .Values.init }}
+    - name: {{ printf "%s-%d" (include "fullname" $global ) (int $i) }}
+      image: "{{- if $obj.image.registry -}}{{ $obj.image.registry }}/{{- end -}}{{ $obj.image.repository }}:{{ $obj.image.tag }}"
+      imagePullPolicy: 
+      {{- if eq $obj.image.tag "latest" }}
+        {{- indent 1 "Always" }}
+      {{- else }}
+        {{- indent 1 (default "IfNotPresent" $obj.image.pullPolicy) }}
+      {{- end }}
+      env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: TZ
+          value: {{ $timezone | quote }}
+    {{- if $obj.env  }}        
+        {{- range $env := $obj.env }}
+        -
+        {{- range $key,$value := $env }}
+        {{- if eq "value" $key }}
+          value: {{ tpl (printf "%s" (trimAll "\"'" $value)) $global }}
+        {{- else if eq $key "valueFrom"}}
+          valueFrom:
+            {{- toYaml $value | trimSuffix "\n" | nindent 12}}
+        {{- else if eq $key "name"}}
+          name: {{ $value }}
+        {{- end }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+    {{- if $obj.command }}
+      command: {{- toYaml $obj.command | trimSuffix "\n" | nindent 8}}
+    {{- end }}
+      volumeMounts:
+        - name: timezone
+          mountPath: /usr/share/zoneinfo/{{ $timezone }}
+    {{- if $obj.volumeMounts }}
+      {{- toYaml $obj.volumeMounts | trimSuffix "\n" | nindent 8}}
+    {{- end }}
+  {{- end }} # end of range .Values.init
+  {{- end }}
+  {{- if .Values.dependencies }}
+    - name: {{ printf "%s-dockerize" (include "fullname" $global)}}
+      image: jwilder/dockerize:{{default "latest" .Values.dockerize.tag }}
+      args:
+        {{- range $depName,$dep := .Values.dependencies }} 
+        - "-wait" 
+        {{- if $dep.service }}
+          {{- $targetHost := include "dependencyHost" (tuple $depName $dep.service $global)}}
+          {{- $targetPort := include "dependencyPort" (tuple $depName $dep.service $global)}}
+        - {{ printf "%s://%s:%d" (default "tcp" $dep.service.type)  $targetHost  (int $targetPort) }}
+            {{- if eq $dep.service.type "http" }}
+              {{- printf "%s" (default "" $dep.service.uri) }}
+            {{- end }}
+        {{- else if $dep.tcp }}
+        - "tcp://{{ $dep.tcp.host }}:{{ $dep.tcp.port }}"
+        {{- else if $dep.http }}
+        - "http://{{ $dep.http.host }}:{{ $dep.http.port }}{{ default "/" $dep.http.uri }}"
+        {{- end }}
+        {{- end }}
+        - "-timeout"
+        - "{{ .Values.dockerize.timeout }}"
+      volumeMounts:
+        - name: timezone
+          mountPath: /usr/share/zoneinfo/{{ $timezone }}
+  {{- end }}
+{{- end }} # end line init
+  containers:
+    - name: {{ .Chart.Name | lower }}
+      image: "{{- if .Values.image.registry -}}{{ .Values.image.registry }}/{{- end -}}{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+      imagePullPolicy: 
+      {{- if eq .Values.image.tag "latest" -}}
+        {{- indent 1 "Always" }}
+      {{- else -}}
+        {{- indent 1 (default "IfNotPresent" .Values.image.pullPolicy) }}
+      {{- end }}
+    {{- if and .Values.services  }}
+      ports:
+      {{- range $svcName,$svc := .Values.services }}
+      {{- range $portName,$port := $svc.ports }}
+        - name: {{ printf "%s-%s" (default $svcName $svc.nameOverride) $portName | trunc 15 | trimSuffix "-" }}
+          containerPort: {{ default ($port.port) $port.targetPort }}
+          protocol: {{default "TCP" $port.protocol }}
+      {{- end }}
+      {{- end }}
+    {{- end }}
+      env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: TZ
+          value: {{ default "Asia/RPC" .Values.global.timezone | quote }}
+    {{- if (.Values.env)  }}        
+        {{- range $env := .Values.env }}
+        -
+        {{- range $key,$value := $env }}
+        {{- if eq "value" $key }}
+          value: {{ tpl (printf "%s" (trimAll "\"'" $value)) $global | quote }}
+        {{- else if eq $key "valueFrom"}}
+          valueFrom:
+            {{- toYaml $value | trimSuffix "\n" | nindent 12}}
+        {{- else if eq $key "name"}}
+          name: {{ $value }}
+        {{- end }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.command }}
+      command:
+        {{- range $cmd := .Values.command }}
+        - {{ $cmd | quote }}
+        {{- end }}
+    {{- end }}
+    {{- if .Values.args }}    
+      args:
+        {{- range $arg := .Values.args }}
+        - {{ $arg | quote }}
+        {{- end }} 
+    {{- end }}
+      volumeMounts:
+        - name: timezone
+          mountPath: /usr/share/zoneinfo/{{ $timezone }}
+    {{- if .Values.configs }}
+      {{- range $config := .Values.configs }}            
+        {{- range $volume := $config.volumes }}
+        - name: {{ $volume.name }}
+          mountPath: {{ $volume.mountPath }}
+          {{- if $volume.subPath }}
+          subPath: {{ $volume.subPath }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+    {{- end }} #end if .Values.configs
+    {{- if .Values.volumeMounts }}
+      {{- toYaml .Values.volumeMounts | trimSuffix "\n" | nindent 8 }}
+    {{- end }}
+    {{- if .Values.livenessProbe }}
+      livenessProbe:
+        {{- toYaml .Values.livenessProbe | trimSuffix "\n" | nindent 8 }}
+    {{- end }}
+    {{- if .Values.readinessProbe }}
+      readinessProbe:
+      {{- toYaml .Values.readinessProbe | trimSuffix "\n" | nindent 8 }}
+    {{- end }}
+    {{- if .Values.resources }}
+      resources:
+        {{- toYaml .Values.resources | trimSuffix "\n" | nindent 8 }}
+    {{- end }}
+    {{- if .Values.lifecycle }}
+      lifecycle:
+      {{- toYaml .Values.lifecycle | trimSuffix "\n" | nindent 8 }}
+    {{- end }}
+  volumes:
+    - name: timezone
+      hostPath:
+        path: /usr/share/zoneinfo/{{ $timezone }}
+
+{{- if .Values.configs }}
+  {{- range $config := .Values.configs }} 
+    {{- range $volume := $config.volumes }}
+    - name: {{ $volume.name }}
+      configMap:
+        name: {{ $config.name }}
+      {{- if $volume.items }}
+        items:
+          {{- toYaml $volume.items | trimSuffix "\n" | nindent 10 }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- if .Values.volumes }}
+  {{- toYaml .Values.volumes | trimSuffix "\n" | nindent 4}}
+{{- end }}
+{{- with .Values.nodeSelector }}
+  nodeSelector:
+  {{- toYaml . | trimSuffix "\n" | nindent 4 }}
+{{- end }}
+{{- with .Values.affinity }}
+  affinity:
+  {{-  toYaml . | trimSuffix "\n" | nindent 4 }}
+{{- end }}
+{{- with .Values.tolerations }}
+  tolerations:
+  {{-  toYaml . | trimSuffix "\n" |  nindent 4 }}
+{{- end }}
+{{- if .Values.securytyContext }}
+  securityContext:
+  {{- toYaml .Values.securytyContext | trimSuffix "\n" | nindent 4}}
+{{- end }}
+{{- if .Values.restartPolicy }}
+  restartPolicy: {{ .Values.restartPolicy }}
+{{- end }}

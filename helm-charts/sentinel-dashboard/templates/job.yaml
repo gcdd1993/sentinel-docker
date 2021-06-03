@@ -1,0 +1,19 @@
+{{- if eq .Values.type "job" }}
+{{- $global := . }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "fullname" $global }}
+  labels:
+    app: {{ include "name" $global }}
+    chart: {{ include "chart" $global }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "name" $global }}
+      release: {{ .Release.Name }}
+  template:
+  {{- tpl (.Files.Get "pod.template" ) $global  | indent 4}}
+{{- end }}
